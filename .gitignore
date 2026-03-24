@@ -36,8 +36,6 @@ tmp/
 .cache/
 
 # Environment files
-.env
-.env.development
 venv/
 .venv/
 
@@ -133,3 +131,4 @@ i18n-unused-keys-report.json
 pnpm-lock.yaml
 .turbo
 spaHtmlTemplates.ts
+config.bat
