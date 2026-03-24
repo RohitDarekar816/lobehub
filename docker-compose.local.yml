@@ -17,10 +17,10 @@ services:
         condition: service_healthy
       rustfs-init:
         condition: service_completed_successfully
-    # Static service-to-service connection strings (always correct inside Docker network)
+    # Static internal Docker-network values (not overridable via .env.local)
     environment:
+      # Server-to-server call within the container itself (not via reverse proxy)
       - 'INTERNAL_APP_URL=http://localhost:3210'
-      - 'S3_ENDPOINT=http://rustfs:9000'
       - 'S3_ENABLE_PATH_STYLE=1'
       - 'S3_SET_ACL=0'
       - 'LLM_VISION_IMAGE_USE_BASE64=1'
@@ -28,8 +28,7 @@ services:
       - 'REDIS_URL=redis://redis:6379'
       - 'REDIS_PREFIX=afintrix'
       - 'REDIS_TLS=0'
-    # All secrets and configurable values come from .env.local
-    # (KEY_VAULTS_SECRET, AUTH_SECRET, DATABASE_URL, S3 keys, AI provider keys, etc.)
+    # All configurable values (APP_URL, S3_ENDPOINT, secrets, AI keys) come from .env.local
     env_file:
       - path: .env.local
         required: true
