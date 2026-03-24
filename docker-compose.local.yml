@@ -1,0 +1,141 @@
+name: afintrix
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: afintrix-app
+    ports:
+      - '${LOBE_PORT:-3210}:3210'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+      rustfs-init:
+        condition: service_completed_successfully
+    # Static service-to-service connection strings (always correct inside Docker network)
+    environment:
+      - 'INTERNAL_APP_URL=http://localhost:3210'
+      - 'S3_ENDPOINT=http://rustfs:9000'
+      - 'S3_ENABLE_PATH_STYLE=1'
+      - 'S3_SET_ACL=0'
+      - 'LLM_VISION_IMAGE_USE_BASE64=1'
+      - 'SEARXNG_URL=http://searxng:8080'
+      - 'REDIS_URL=redis://redis:6379'
+      - 'REDIS_PREFIX=afintrix'
+      - 'REDIS_TLS=0'
+    # All secrets and configurable values come from .env.local
+    # (KEY_VAULTS_SECRET, AUTH_SECRET, DATABASE_URL, S3 keys, AI provider keys, etc.)
+    env_file:
+      - path: .env.local
+        required: true
+    restart: unless-stopped
+    networks:
+      - afintrix-network
+
+  postgresql:
+    image: paradedb/paradedb:latest-pg17
+    container_name: afintrix-postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - 'postgres_data:/var/lib/postgresql/data'
+    environment:
+      - 'POSTGRES_DB=${LOBE_DB_NAME:-afintrix}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-lobechat_pass}'
+      - 'POSTGRES_USER=postgres'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - afintrix-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: afintrix-redis
+    ports:
+      - '6379:6379'
+    command: redis-server --save 60 1000 --appendonly yes
+    volumes:
+      - 'redis_data:/data'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - afintrix-network
+
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: afintrix-rustfs
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    environment:
+      - 'RUSTFS_CONSOLE_ENABLE=true'
+      - 'RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:-admin}'
+      - 'RUSTFS_SECRET_KEY=${RUSTFS_SECRET_KEY:-changeme123}'
+    volumes:
+      - 'rustfs_data:/data'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:9000/health >/dev/null 2>&1 || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    command:
+      ['--access-key', '${RUSTFS_ACCESS_KEY:-admin}', '--secret-key', '${RUSTFS_SECRET_KEY:-changeme123}', '/data']
+    restart: unless-stopped
+    networks:
+      - afintrix-network
+
+  rustfs-init:
+    image: minio/mc:latest
+    container_name: afintrix-rustfs-init
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    volumes:
+      - ./docker-compose/deploy/bucket.config.json:/bucket.config.json:ro
+    entrypoint: /bin/sh
+    command: >
+      -c '
+        set -eux;
+        mc alias set rustfs "http://rustfs:9000" "${RUSTFS_ACCESS_KEY:-admin}" "${RUSTFS_SECRET_KEY:-changeme123}";
+        mc mb "rustfs/${RUSTFS_LOBE_BUCKET:-lobe}" --ignore-existing;
+        mc anonymous set-json "/bucket.config.json" "rustfs/${RUSTFS_LOBE_BUCKET:-lobe}";
+      '
+    restart: 'no'
+    networks:
+      - afintrix-network
+
+  searxng:
+    image: searxng/searxng
+    container_name: afintrix-searxng
+    volumes:
+      - ./docker-compose/deploy/searxng-settings.yml:/etc/searxng/settings.yml
+    environment:
+      - 'SEARXNG_SETTINGS_FILE=/etc/searxng/settings.yml'
+    restart: unless-stopped
+    networks:
+      - afintrix-network
+
+networks:
+  afintrix-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  rustfs_data:
+    driver: local
