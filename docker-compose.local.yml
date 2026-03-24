@@ -6,8 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: lobehub-app
-    ports:
-      - '${LOBE_PORT:-3210}:3210'
+    expose:
+      - '3210'
     depends_on:
       postgresql:
         condition: service_healthy
@@ -39,8 +39,8 @@ services:
   postgresql:
     image: paradedb/paradedb:latest-pg17
     container_name: lobehub-postgres
-    ports:
-      - '5432:5432'
+    expose:
+      - '5432'
     volumes:
       - 'postgres_data:/var/lib/postgresql/data'
     environment:
@@ -59,8 +59,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: lobehub-redis
-    ports:
-      - '6379:6379'
+    expose:
+      - '6379'
     command: redis-server --save 60 1000 --appendonly yes
     volumes:
       - 'redis_data:/data'
@@ -76,9 +76,9 @@ services:
   rustfs:
     image: rustfs/rustfs:latest
     container_name: lobehub-rustfs
-    ports:
-      - '9000:9000'
-      - '9001:9001'
+    expose:
+      - '9000'
+      - '9001'
     environment:
       - 'RUSTFS_CONSOLE_ENABLE=true'
       - 'RUSTFS_ACCESS_KEY=${RUSTFS_ACCESS_KEY:-admin}'
