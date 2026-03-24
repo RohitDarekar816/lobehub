@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: afintrix-app
+    container_name: lobehub-app
     ports:
       - '${LOBE_PORT:-3210}:3210'
     depends_on:
@@ -39,7 +39,7 @@ services:
 
   postgresql:
     image: paradedb/paradedb:latest-pg17
-    container_name: afintrix-postgres
+    container_name: lobehub-postgres
     ports:
       - '5432:5432'
     volumes:
@@ -59,7 +59,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: afintrix-redis
+    container_name: lobehub-redis
     ports:
       - '6379:6379'
     command: redis-server --save 60 1000 --appendonly yes
@@ -76,7 +76,7 @@ services:
 
   rustfs:
     image: rustfs/rustfs:latest
-    container_name: afintrix-rustfs
+    container_name: lobehub-rustfs
     ports:
       - '9000:9000'
       - '9001:9001'
@@ -99,7 +99,7 @@ services:
 
   rustfs-init:
     image: minio/mc:latest
-    container_name: afintrix-rustfs-init
+    container_name: lobehub-rustfs-init
     depends_on:
       rustfs:
         condition: service_healthy
@@ -119,7 +119,7 @@ services:
 
   searxng:
     image: searxng/searxng
-    container_name: afintrix-searxng
+    container_name: lobehub-searxng
     volumes:
       - ./docker-compose/deploy/searxng-settings.yml:/etc/searxng/settings.yml
     environment:
